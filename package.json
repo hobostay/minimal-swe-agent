@@ -1,0 +1,25 @@
+{
+  "name": "minimal-swe-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A small TypeScript SWE agent with its own loop, scheduler, executor, terminal sessions, and file tools.",
+  "bin": {
+    "minimal-swe-agent": "dist/src/cli.js"
+  },
+  "exports": "./dist/src/index.js",
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/cli.js",
+    "test": "npm run build && node --test dist/test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}
