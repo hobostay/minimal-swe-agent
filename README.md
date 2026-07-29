@@ -1,5 +1,7 @@
 # minimal-swe-agent
 
+**English** | [简体中文](./README_zh-CN.md)
+
 A small software-engineering agent written in TypeScript without an agent
 framework. The project focuses on the essential execution path of a coding
 agent: scheduling work, constructing context, calling a model, executing tools,
