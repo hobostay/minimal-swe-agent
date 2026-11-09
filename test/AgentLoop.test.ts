@@ -45,3 +45,35 @@ test("runs a tool call and returns the final model response", async () => {
   assert.equal(result.output, "done");
   assert.equal(result.messages.filter(message => message.role === "tool").length, 1);
 });
+
+for (const finishReason of ["tool_calls", "length"] as const) {
+  test(finishReason === "length" ? "does not execute a tool call from a truncated response" : "cancels the remaining calls in a batch", async () => {
+    const controller = new AbortController();
+    let executions = 0;
+    const registry = new ToolRegistry().register({
+      mutates: true,
+      definition: { name: "edit", description: "edit", inputSchema: {} },
+      validate: input => input,
+      async execute(_, context) {
+        assert.equal(context.signal, controller.signal);
+        executions += 1;
+        controller.abort();
+        return toolSuccess("edited");
+      },
+    });
+    const model: ModelClient = {
+      async generate() {
+        return {
+          content: "",
+          toolCalls: ["1", "2"].map(id => ({ id, name: "edit", arguments: {} })),
+          finishReason,
+        };
+      },
+    };
+    const executor = new ToolExecutor(registry, new PermissionPolicy("auto"), { cwd: process.cwd() });
+    const result = await new AgentLoop(model, registry, executor).run([], controller.signal);
+    assert.equal(result.status, finishReason === "length" ? "failed" : "aborted");
+    assert.equal(result.steps, 1);
+    assert.equal(executions, finishReason === "length" ? 0 : 1);
+  });
+}
