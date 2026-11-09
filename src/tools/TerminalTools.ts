@@ -9,15 +9,16 @@ import {
 } from "./Tool.js";
 
 type ExecInput = { command: string; yieldMs: number; timeoutMs: number };
-type ReadInput = { sessionId: string };
+type ReadInput = { sessionId: string; waitMs: number };
 type WriteInput = { sessionId: string; input: string };
 type KillInput = { sessionId: string; signal: NodeJS.Signals };
 
 export class TerminalExecTool implements Tool<ExecInput> {
+  readonly terminal = true;
   readonly mutates = true;
   readonly definition = {
     name: "terminal_exec",
-    description: "Run a shell command. Returns output immediately or a sessionId when still running.",
+    description: "Run a POSIX shell command. A running command is not yet verified; poll with terminal_read. Nonzero exit is a failure.",
     inputSchema: {
       type: "object",
       properties: {
@@ -47,13 +48,17 @@ export class TerminalExecTool implements Tool<ExecInput> {
 }
 
 export class TerminalReadTool implements Tool<ReadInput> {
+  readonly terminal = true;
   readonly mutates = false;
   readonly definition = {
     name: "terminal_read",
     description: "Read only the new output produced by a terminal session since the previous read.",
     inputSchema: {
       type: "object",
-      properties: { sessionId: { type: "string" } },
+      properties: {
+        sessionId: { type: "string" },
+        waitMs: { type: "number", description: "Wait briefly when there is no new output; defaults to 1000." },
+      },
       required: ["sessionId"],
       additionalProperties: false,
     },
@@ -61,14 +66,16 @@ export class TerminalReadTool implements Tool<ReadInput> {
 
   constructor(private readonly sessions: TerminalSessionManager) {}
   validate(input: unknown): ReadInput {
-    return { sessionId: requiredString(objectInput(input), "sessionId") };
+    const value = objectInput(input);
+    return { sessionId: requiredString(value, "sessionId"), waitMs: Math.min(5_000, optionalNumber(value, "waitMs", 1_000)) };
   }
   async execute(input: ReadInput): Promise<ToolResult> {
-    return this.sessions.read(input.sessionId);
+    return this.sessions.readAfterWait(input.sessionId, input.waitMs);
   }
 }
 
 export class TerminalWriteTool implements Tool<WriteInput> {
+  readonly terminal = true;
   readonly mutates = true;
   readonly definition = {
     name: "terminal_write",
@@ -93,6 +100,7 @@ export class TerminalWriteTool implements Tool<WriteInput> {
 }
 
 export class TerminalKillTool implements Tool<KillInput> {
+  readonly terminal = true;
   readonly mutates = true;
   readonly definition = {
     name: "terminal_kill",

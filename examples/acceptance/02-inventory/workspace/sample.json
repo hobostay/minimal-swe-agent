@@ -1,0 +1,5 @@
+[
+  { "sku": "ab-1", "stock": 8 },
+  { "sku": "AB-1", "stock": 3 },
+  { "sku": "zz-2", "stock": 0 }
+]

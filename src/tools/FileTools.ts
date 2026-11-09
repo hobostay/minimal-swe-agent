@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { constants } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { resolveReadablePath, resolveWritablePath } from "../runtime/PathSafety.js";
@@ -47,7 +48,7 @@ export class ReadFileTool implements Tool<ReadFileInput> {
     const stat = await fs.stat(file);
     if (!stat.isFile()) throw new Error(`${input.path} is not a file.`);
     if (stat.size > 5_000_000) throw new Error("File exceeds the 5 MB text-file limit.");
-    const text = await fs.readFile(file, "utf8");
+    const text = await fs.readFile(file, { encoding: "utf8", signal: context.signal });
     if (text.includes("\0")) throw new Error("Binary files are not supported.");
     const lines = text.split(/\r?\n/);
     const selected = lines
@@ -89,8 +90,15 @@ export class WriteFileTool implements Tool<WriteFileInput> {
 
   async execute(input: WriteFileInput, context: ToolContext): Promise<ToolResult> {
     const file = await resolveWritablePath(context.cwd, input.path);
+    context.signal?.throwIfAborted();
     await fs.mkdir(path.dirname(file), { recursive: true });
-    await fs.writeFile(file, input.content, "utf8");
+    context.signal?.throwIfAborted();
+    const handle = await fs.open(file, constants.O_WRONLY | constants.O_CREAT | constants.O_TRUNC | constants.O_NOFOLLOW);
+    try {
+      await handle.writeFile(input.content, "utf8");
+    } finally {
+      await handle.close();
+    }
     return toolSuccess(`Wrote ${Buffer.byteLength(input.content)} bytes to ${input.path}.`, {
       path: input.path,
     });
@@ -150,6 +158,7 @@ export class SearchTextTool implements Tool<SearchInput> {
     const result = await runArgv(
       "rg",
       [
+        "--no-config",
         "--line-number",
         "--color=never",
         "--hidden",
@@ -157,6 +166,7 @@ export class SearchTextTool implements Tool<SearchInput> {
         "--glob=!.git/**",
         "--max-count",
         String(input.maxResults),
+        "--",
         input.query,
         searchRoot,
       ],
@@ -199,6 +209,7 @@ export class ListFilesTool implements Tool<ListFilesInput> {
     const root = await resolveReadablePath(context.cwd, input.path);
     const files: string[] = [];
     const walk = async (directory: string, depth: number): Promise<void> => {
+      context.signal?.throwIfAborted();
       if (depth > input.depth || files.length >= input.maxResults) return;
       const entries = await fs.readdir(directory, { withFileTypes: true });
       entries.sort((a, b) => a.name.localeCompare(b.name));

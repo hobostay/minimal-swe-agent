@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "scripts": {
+    "ci": "node --test test/*.test.cjs",
+    "smoke": "node --test test/smoke.cjs"
+  }
+}

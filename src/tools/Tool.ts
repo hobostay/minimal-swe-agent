@@ -8,6 +8,7 @@ export type ToolContext = {
 export interface Tool<TInput = unknown> {
   readonly definition: ToolDefinition;
   readonly mutates: boolean;
+  readonly terminal?: boolean;
   validate(input: unknown): TInput;
   execute(input: TInput, context: ToolContext): Promise<ToolResult>;
 }
